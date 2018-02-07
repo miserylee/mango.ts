@@ -34,7 +34,7 @@ async function createAPerson(): Promise<IPersonDocument> {
       profile: {
         nickname: 'Mis',
       },
-      __t: t,
+      __t: t, // Inject transaction
     });
   }, 'create a person');
 
@@ -100,7 +100,7 @@ async function createAWalletAndRecharge(persnId: IObjectId) {
     }, {
       __t: t,
     });
-  });
+  }, 'create wallet and recharge');
 
   if (wallet) {
     wallet = await Wallet.findById(wallet._id);
