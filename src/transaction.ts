@@ -69,7 +69,19 @@ export interface ITransactionModel extends Model<ITransactionDocument> {
   cure(timeout?: number): void;
 }
 
-export default (connection: Connection, Recycle: IRecycleModel): ITransactionModel => {
+export default (connection: Connection, Recycle: IRecycleModel, {
+  didTransactionInitialized = () => null,
+  didTransactionPended = () => null,
+  didTransactionCommitted = () => null,
+  didTransactionCancelled = () => null,
+  didTransactionCured = () => null,
+}: {
+  didTransactionInitialized?: (t: ITransactionDocument, mark: string, memo: any) => void;
+  didTransactionPended?: (t: ITransactionDocument, modelName: string) => void;
+  didTransactionCommitted?: (t: ITransactionDocument, cost: number) => void;
+  didTransactionCancelled?: (t: ITransactionDocument, cost: number, error: IError) => void;
+  didTransactionCured?: (transactions: ITransactionDocument[]) => void;
+} = {}): ITransactionModel => {
   const schema = new Schema(definition);
 
   schema.index({ _id: 1, state: 1 });
@@ -93,6 +105,7 @@ export default (connection: Connection, Recycle: IRecycleModel): ITransactionMod
 
   schema.statics.initialize = async function(mark: string, memo: any) {
     const t = await this.create({ mark, memo, initializedAt: new Date() });
+    await didTransactionInitialized(t, mark, memo);
     return t._id;
   };
 
@@ -116,6 +129,7 @@ export default (connection: Connection, Recycle: IRecycleModel): ITransactionMod
     if (!t) {
       throw new Error(`Transaction [${id}] is not valid.`);
     }
+    await didTransactionPended(t, modelName);
   };
 
   schema.statics.commit = async function(id: IObjectId) {
@@ -149,6 +163,7 @@ export default (connection: Connection, Recycle: IRecycleModel): ITransactionMod
     t.state = TRANSACTION_STATE.finished;
     t.cost = Date.now() - t.initializedAt.getTime();
     await t.save();
+    await didTransactionCommitted(t, t.cost);
   };
 
   schema.statics.cancel = async function(id: IObjectId, error: IError) {
@@ -217,6 +232,7 @@ export default (connection: Connection, Recycle: IRecycleModel): ITransactionMod
     t.state = TRANSACTION_STATE.cancelled;
     t.cost = Date.now() - t.initializedAt.getTime();
     await t.save();
+    await didTransactionCancelled(t, t.cost, error);
   };
 
   schema.statics.try = async function(fn: (tid: IObjectId) => {}, mark: string, memo: any) {
@@ -248,6 +264,7 @@ export default (connection: Connection, Recycle: IRecycleModel): ITransactionMod
         await this.cancel(t, new Error('Cancel unprocessed.'));
       }
     }
+    await didTransactionCured(transactions);
   };
 
   return connection.model<ITransactionDocument, ITransactionModel>('transaction', schema);

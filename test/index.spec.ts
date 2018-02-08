@@ -111,3 +111,7 @@ async function createAWalletAndRecharge(persnId: IObjectId) {
     }
   }
 }
+
+after(async () => {
+  connection.close();
+});

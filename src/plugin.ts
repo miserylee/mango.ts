@@ -110,7 +110,11 @@ export interface IQuery<T extends IPluggedDocument> extends Query<IPluggedDocume
   _conditions: any;
 }
 
-export default (Transaction: ITransactionModel, Recycle: IRecycleModel) => {
+export default (Transaction: ITransactionModel, Recycle: IRecycleModel, {
+  didDocumentLocked = () => null,
+}: {
+  didDocumentLocked?: <T extends IPluggedDocument>(tid: IObjectId, model: IPluggedModel<T>, doc: T) => void;
+} = {}) => {
   return (schema: Schema) => {
     schema.add({
       __t: { type: Schema.Types.ObjectId, index: true },
@@ -141,6 +145,8 @@ export default (Transaction: ITransactionModel, Recycle: IRecycleModel) => {
       });
       if (!doc) {
         throw new Error('Resource is busy or not exists.');
+      } else {
+        didDocumentLocked(tid, this, doc);
       }
       // save backup
       if (typeof doc.__b === 'undefined') {
